@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HK Live + Tech + Tennis Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#f5f6f8;color:#111;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+h1{font-size:20px}
+.sub{font-size:12px;color:#777}
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
+@media(min-width:1300px){.grid{grid-template-columns:1fr 1fr 1fr 1fr}}
+.card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.05)}
+.card h2{font-size:15px;margin-bottom:10px}
+ul{list-style:none}
+li{padding:10px 0;border-bottom:1px solid #f0f0f0}
+li a{color:#111;text-decoration:none;font-size:14px;line-height:1.4;display:block}
+li a:hover{color:#0a66c2}
+.meta{font-size:11px;color:#999;margin-top:3px}
+.loading{color:#999;font-size:13px;padding:10px 0}
+.btn{padding:8px 14px;border-radius:999px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+<div>
+<h1>Live Dashboard: HK • Yahoo • Tech • Tennis</h1>
+<div class="sub" id="updateTime">Loading live feeds...</div>
+</div>
+<button class="btn" onclick="loadAll()">↻ Refresh</button>
+</header>
+<div class="grid">
+<div class="card"><h2>🇭🇰 Hong Kong</h2><div id="hk" class="loading">Loading...</div></div>
+<div class="card"><h2>🟣 Yahoo HK</h2><div id="yahoo" class="loading">Loading...</div></div>
+<div class="card"><h2>💻 Tech Top 10</h2><div id="tech" class="loading">Loading...</div></div>
+<div class="card"><h2>🎾 Tennis Latest</h2><div id="tennis" class="loading">Loading...</div></div>
+</div>
+<script>
+const PROXY = "https://api.allorigins.win/raw?url=";
+const FEEDS = {
+  hk: ["https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml","https://www.scmp.com/rss/2/feed"],
+  yahoo: ["https://hk.news.yahoo.com/rss","https://hk.news.yahoo.com/rss/hong-kong"],
+  tech: ["https://techcrunch.com/feed/","https://www.theverge.com/rss/index.xml","https://feeds.arstechnica.com/arstechnica/index"],
+  tennis: ["https://www.espn.com/espn/rss/tennis/news","https://www.skysports.com/rss/0,20514,12110,00.xml","https://www.tennis.com/news/rss","https://feeds.bbci.co.uk/sport/tennis/rss.xml"]
+};
+async function fetchRSS(url){
+  try{
+    const res = await fetch(PROXY + encodeURIComponent(url));
+    const text = await res.text();
+    const doc = new DOMParser().parseFromString(text, "text/xml");
+    return [...doc.querySelectorAll("item")].slice(0,15).map(i=>({
+      title: i.querySelector("title")?.textContent?.trim(),
+      link: i.querySelector("link")?.textContent?.trim() || i.querySelector("guid")?.textContent?.trim(),
+      pub: i.querySelector("pubDate")?.textContent?.trim(),
+      source: new URL(url).hostname.replace('www.','')
+    })).filter(x=>x.title && x.link);
+  }catch(e){ return []; }
+}
+function renderList(id, items, limit){
+  const el = document.getElementById(id);
+  if(!items.length){ el.innerHTML = `<div style="font-size:12px;color:#c00">Feed busy, retry.</div>`; return; }
+  el.innerHTML = "<ul>"+ items.slice(0,limit).map(it=>{
+    const t = it.pub? new Date(it.pub).toLocaleTimeString('en-HK',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Hong_Kong'}) : '';
+    return `<li><a href="${it.link}" target="_blank">${it.title}</a><div class="meta">${t} • ${it.source}</div></li>`;
+  }).join("")+"</ul>";
+}
+async function loadGroup(name){
+  let all=[]; for(const u of FEEDS[name]){ all=all.concat(await fetchRSS(u)); }
+  const seen=new Set(); const uniq=[]; for(const it of all){ if(!seen.has(it.title)){ seen.add(it.title); uniq.push(it); } }
+  uniq.sort((a,b)=> new Date(b.pub)-new Date(a.pub));
+  renderList(name, uniq, name==='tech'||name==='tennis'?10:12);
+}
+async function loadAll(){
+  document.getElementById("updateTime").textContent = "Fetching live at " + new Date().toLocaleString("en-HK",{timeZone:"Asia/Hong_Kong"})+" HKT";
+  ["hk","yahoo","tech","tennis"].forEach(id=> document.getElementById(id).innerHTML='<div class="loading">Loading...</div>');
+  await Promise.all(["hk","yahoo","tech","tennis"].map(loadGroup));
+  document.getElementById("updateTime").textContent = "Live • Updated "+ new Date().toLocaleString("en-HK",{timeZone:"Asia/Hong_Kong"})+" HKT • Auto refresh 10m";
+}
+loadAll(); setInterval(loadAll, 10*60*1000);
+</script>
+</body>
+</html>
