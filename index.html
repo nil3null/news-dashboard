@@ -1,50 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HK Live - Fast Cache Version</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#f5f6f8;color:#111;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+h1{font-size:19px}.sub{font-size:12px;color:#777}
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
+@media(min-width:1300px){.grid{grid-template-columns:1fr 1fr 1fr 1fr}}
+.card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.05);min-height:120px}
+.card h2{font-size:15px;margin-bottom:10px}
+ul{list-style:none}li{padding:10px 0;border-bottom:1px solid #f0f0f0}
+li a{color:#111;text-decoration:none;font-size:14px;display:block}
+.meta{font-size:11px;color:#999;margin-top:3px}
+.btn{padding:8px 14px;border-radius:999px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+<div><h1>Live: HK • Yahoo • Tech • Tennis</h1><div class="sub" id="updateTime">Loading...</div></div>
+<button class="btn" onclick="loadAll(true)">↻ Refresh</button>
+</header>
+<div class="grid">
+<div class="card"><h2>🇭🇰 Hong Kong</h2><div id="hk">Loading from cache...</div></div>
+<div class="card"><h2>🟣 Yahoo HK</h2><div id="yahoo">Loading from cache...</div></div>
+<div class="card"><h2>💻 Tech Top 10</h2><div id="tech">Loading from cache...</div></div>
+<div class="card"><h2>🎾 Tennis</h2><div id="tennis">Loading from cache...</div></div>
+</div>
 <script>
-// REPLACE your whole <script> with this improved one
-const PROXIES=[u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,u=>`https://corsproxy.io/?${encodeURIComponent(u)}`];
+const PROXIES=[url=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,url=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,url=>`https://corsproxy.io/?${encodeURIComponent(url)}`];
 const FEEDS={
 hk:["https://hongkongfp.com/feed/","https://www.thestandard.com.hk/rss.xml","https://news.google.com/rss?hl=en-HK&gl=HK&ceid=HK:en"],
 yahoo:["https://hk.news.yahoo.com/rss"],
-tech:["https://techcrunch.com/feed/","https://www.theverge.com/rss/index.xml"],
-tennis:["https://www.espn.com/espn/rss/tennis/news","https://feeds.bbci.co.uk/sport/tennis/rss.xml"]
+tech:["https://techcrunch.com/feed/","https://www.theverge.com/rss/index.xml","https://feeds.arstechnica.com/arstechnica/index"],
+tennis:["https://www.espn.com/espn/rss/tennis/news","https://feeds.bbci.co.uk/sport/tennis/rss.xml","https://www.tennis.com/news/rss"]
 };
-const CACHE_KEY="news_cache_v3"; const CACHE_TTL=10*60*1000; // 10 min
-
-function getCache(){ try{return JSON.parse(localStorage.getItem(CACHE_KEY)||"{}")}catch{return {}} }
-function setCache(group,items){ const c=getCache(); c[group]={items,time:Date.now()}; localStorage.setItem(CACHE_KEY,JSON.stringify(c)); }
-function renderList(id,items){ const el=document.getElementById(id); if(!items.length) return; el.innerHTML="<ul>"+items.slice(0,10).map(it=>`<li><a href="${it.link}" target="_blank">${it.title}</a><div class="meta">${it.source} • ${it.pub?new Date(it.pub).toLocaleTimeString('en-HK',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Hong_Kong'}):''}</div></li>`).join("")+"</ul>"; }
-
-async function fetchWithFallback(url){
- for(const p of PROXIES){ try{const r=await fetch(p(url),{cache:'no-store'}); if(!r.ok) continue; const t=await r.text(); if(t.includes("<item")) return t;}catch(e){} }
- try{const j=await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`).then(r=>r.json()); if(j.items) return j;}catch(e){}
- return null;
+const CACHE_KEY="news_cache_v3"; const CACHE_TTL=10*60*1000;
+function getCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||"{}")}catch{return{}}}
+function setCache(g,items){const c=getCache();c[g]={items,time:Date.now()};localStorage.setItem(CACHE_KEY,JSON.stringify(c));}
+function renderList(id,items){const el=document.getElementById(id);if(!items||!items.length)return;el.innerHTML="<ul>"+items.slice(0,12).map(it=>`<li><a href="${it.link}" target="_blank">${it.title}</a><div class="meta">${it.pub?new Date(it.pub).toLocaleTimeString('en-HK',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Hong_Kong'}):''} • ${it.source}</div></li>`).join("")+"</ul>";}
+async function fetchWithFallback(url){for(const p of PROXIES){try{const r=await fetch(p(url),{cache:'no-store'});if(!r.ok)continue;const t=await r.text();if(t.includes("<item"))return t;}catch{}}try{const j=await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`).then(r=>r.json());if(j.items)return j;}catch{}return null;}
+async function parseFeed(url){const raw=await fetchWithFallback(url);if(!raw)return[];if(typeof raw==='object'&&raw.items)return raw.items.map(it=>({title:it.title,link:it.link,pub:it.pubDate,source:new URL(url).hostname.replace('www.','')}));try{const d=new DOMParser().parseFromString(raw,"text/xml");return[...d.querySelectorAll("item")].slice(0,15).map(i=>({title:i.querySelector("title")?.textContent?.trim(),link:i.querySelector("link")?.textContent?.trim(),pub:i.querySelector("pubDate")?.textContent?.trim(),source:new URL(url).hostname.replace('www.','')})).filter(x=>x.title);}catch{return[];}}
+async function loadGroup(name){let all=[];for(const u of FEEDS[name]){all=all.concat(await parseFeed(u));if(all.length>=12)break;}const seen=new Set(),uniq=[];for(const it of all){if(!seen.has(it.title)){seen.add(it.title);uniq.push(it);}}uniq.sort((a,b)=>new Date(b.pub)-new Date(a.pub));if(uniq.length){renderList(name,uniq);setCache(name,uniq);}}
+async function loadAll(force){
+ if(force){document.getElementById("updateTime").textContent="Refreshing...";await Promise.all(["hk","yahoo","tech","tennis"].map(g=>loadGroup(g)));document.getElementById("updateTime").textContent="Live • Updated "+new Date().toLocaleString("en-HK",{timeZone:"Asia/Hong_Kong"})+" HKT";return;}
+ const cache=getCache(); let has=false;["hk","yahoo","tech","tennis"].forEach(g=>{if(cache[g]?.items){renderList(g,cache[g].items);has=true;}});
+ if(has){const last=Math.max(...Object.values(cache).map(v=>v.time||0));document.getElementById("updateTime").textContent="⚡ Instant from cache • Updating in background... • "+new Date(last).toLocaleTimeString('en-HK',{timeZone:'Asia/Hong_Kong'});Promise.all(["hk","yahoo","tech","tennis"].map(g=>loadGroup(g))).then(()=>{document.getElementById("updateTime").textContent="Live • Updated "+new Date().toLocaleString("en-HK",{timeZone:"Asia/Hong_Kong"})+" HKT • Cached for fast back";});}
+ else{document.getElementById("updateTime").textContent="First load — fetching...";await Promise.all(["hk","yahoo","tech","tennis"].map(g=>loadGroup(g)));document.getElementById("updateTime").textContent="Live • Updated "+new Date().toLocaleString("en-HK",{timeZone:"Asia/Hong_Kong"})+" HKT";}
 }
-async function parseFeed(url){
- const raw=await fetchWithFallback(url); if(!raw) return [];
- if(typeof raw==='object'&&raw.items) return raw.items.map(it=>({title:it.title,link:it.link,pub:it.pubDate,source:new URL(url).hostname.replace('www.','')}));
- try{const d=new DOMParser().parseFromString(raw,"text/xml"); return [...d.querySelectorAll("item")].slice(0,12).map(i=>({title:i.querySelector("title")?.textContent?.trim(),link:i.querySelector("link")?.textContent?.trim(),pub:i.querySelector("pubDate")?.textContent?.trim(),source:new URL(url).hostname.replace('www.','')})).filter(x=>x.title);}catch{return [];}
-}
-async function loadGroup(name, background=false){
- if(!background){ const cached=getCache()[name]; if(cached&&Date.now()-cached.time<CACHE_TTL){ renderList(name,cached.items); document.getElementById("updateTime").textContent="From cache • Tap ↻ to update • "+new Date(cached.time).toLocaleTimeString('en-HK',{timeZone:'Asia/Hong_Kong'}); } }
- let all=[]; for(const u of FEEDS[name]){ all=all.concat(await parseFeed(u)); if(all.length>10) break; }
- const seen=new Set(),uniq=[]; for(const it of all){ if(!seen.has(it.title)){seen.add(it.title); uniq.push(it);} } uniq.sort((a,b)=>new Date(b.pub)-new Date(a.pub));
- if(uniq.length){ renderList(name,uniq); setCache(name,uniq); }
-}
-async function loadAll(force=false){
- if(force) localStorage.removeItem(CACHE_KEY);
- if(!force){
-   // instant cache first
-   ["hk","yahoo","tech","tennis"].forEach(g=>{ const c=getCache()[g]; if(c) renderList(g,c.items); });
-   document.getElementById("updateTime").textContent="Loaded instantly from cache • Updating in background...";
-   // background refresh
-   Promise.all(["hk","yahoo","tech","tennis"].map(g=>loadGroup(g,true))).then(()=>{ document.getElementById("updateTime").textContent="Live • Updated "+new Date().toLocaleString("en-HK",{timeZone:"Asia/Hong_Kong"})+" HKT"; });
-   return;
- }
- document.getElementById("updateTime").textContent="Refreshing...";
- await Promise.all(["hk","yahoo","tech","tennis"].map(g=>loadGroup(g,true)));
- document.getElementById("updateTime").textContent="Live • Updated "+new Date().toLocaleString("en-HK",{timeZone:"Asia/Hong_Kong"})+" HKT";
-}
-// On first load: instant cache, background update
 loadAll(false);
-// Don't auto-refresh when coming back via back button
-document.addEventListener("visibilitychange",()=>{ /* no auto fetch */ });
 </script>
+</body>
+</html>
